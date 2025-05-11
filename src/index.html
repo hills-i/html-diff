@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Diff</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; }
+        .container { display: flex; flex-direction: column; height: 100vh; }
+        .controls { padding: 10px; border-bottom: 1px solid #ccc; background-color: #f8f8f8; }
+        .url-inputs-container { display: flex; justify-content: space-between; width: 100%; gap: 20px; }
+        .url-input-group { flex: 1; display: flex; align-items: center; }
+        .url-input-group input[type="url"] { flex: 1; min-width: 0; }
+        .url-input-group label { margin-right: 10px; white-space: nowrap; }
+        .controls label { margin-right: 5px; }
+        .controls input[type="file"] { margin-right: 15px; }
+        .iframes-container { display: flex; flex-grow: 1; border-top: 1px solid #ccc; }
+        .iframe-group { flex: 1; border-right: 1px solid #ccc; overflow: hidden; position: relative; }
+        .iframe-group:last-child { border-right: none; }
+        .iframe-group iframe { width: 100%; height: 100%; border: none; }
+        .iframe-group h3 { text-align: center; margin: 5px 0; font-size: 1em; background-color: #eee; padding: 5px; position: absolute; top: 0; left:0; right: 0; z-index: 1;}
+        .iframe-content { padding-top: 30px; height: calc(100% - 30px); overflow: auto; }
+        .diff-highlight { background-color: yellow !important; outline: 1px solid orange; }
+        #diffBtn { display: block; margin: 10px auto 0; padding: 5px 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <div class="url-inputs-container">
+                <div class="url-input-group">
+                    <label for="url1">URL 1:</label>
+                    <input type="url" id="url1" placeholder="https://example.com/page1.html" required>
+                </div>
+                <div class="url-input-group">
+                    <label for="url2">URL 2:</label>
+                    <input type="url" id="url2" placeholder="https://example.com/page2.html" required>
+                </div>
+            </div>
+            <button id="diffBtn">Compare!</button>
+        </div>
+        <div class="iframes-container">
+            <div class="iframe-group">
+                <h3>URL 1</h3>
+                <div class="iframe-content">
+                    <iframe id="iframe1" title="URL 1 Content" sandbox="allow-same-origin allow-scripts"></iframe>
+                </div>
+            </div>
+            <div class="iframe-group">
+                <h3>URL 2</h3>
+                <div class="iframe-content">
+                    <iframe id="iframe2" title="URL 2 Content" sandbox="allow-same-origin allow-scripts"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="diff.js"></script>
+</body>
+</html>
