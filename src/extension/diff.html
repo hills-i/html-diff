@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Diff</title>
+    <link rel="stylesheet" href="diff.css">
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <div class="mode-switcher">
+                <label><input type="radio" name="mode" value="fullurl" checked> Full URL</label>
+                <label><input type="radio" name="mode" value="domain-path"> Domain + Path</label>
+            </div>
+            <div id="fullurl-inputs" class="url-inputs-container">
+                <div class="url-input-group">
+                    <label for="url1">URL 1:</label>
+                    <input type="url" id="url1" placeholder="https://example.com/page1.html" required>
+                </div>
+                <div class="url-input-group">
+                    <label for="url2">URL 2:</label>
+                    <input type="url" id="url2" placeholder="https://example.org/page1.html" required>
+                </div>
+            </div>
+            <div id="domain-path-inputs" class="hidden">
+                <div class="url-inputs-container">
+                    <div class="url-input-group">
+                        <label for="domain1">Domain 1:</label>
+                        <input type="text" id="domain1" placeholder="https://staging.example.com">
+                    </div>
+                    <div class="url-input-group">
+                        <label for="domain2">Domain 2:</label>
+                        <input type="text" id="domain2" placeholder="https://www.example.com">
+                    </div>
+                </div>
+                <div class="path-input-container">
+                    <label for="path">Path:</label>
+                    <input type="text" id="path" placeholder="/page.html" value="/">
+                </div>
+            </div>
+            <button id="diffBtn">Compare!</button>
+            <label for="autoCompare"><input type="checkbox" id="autoCompare"> Auto Compare</label>
+            <label for="ignoreDomain"><input type="checkbox" id="ignoreDomain"> Ignore Domain Differences</label>
+        </div>
+        <div class="iframes-container">
+            <div class="iframe-group">
+                <h3>URL 1</h3>
+                <div class="iframe-content">
+                    <iframe id="iframe1" title="URL 1 Content" sandbox="allow-same-origin"></iframe>
+                </div>
+            </div>
+            <div class="iframe-group">
+                <h3>URL 2</h3>
+                <div class="iframe-content">
+                    <iframe id="iframe2" title="URL 2 Content" sandbox="allow-same-origin"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="diff.js"></script>
+</body>
+</html>
