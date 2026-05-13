@@ -40,7 +40,7 @@ Side-by-side visual comparison tool for web pages with difference highlighting. 
 1. The service worker (`background.js`) fetches both URLs using the browser's `fetch` API with `host_permissions`, bypassing CORS restrictions
 2. Fetched HTML is sanitized (scripts and event handlers removed) and a `<base>` tag is injected for correct relative-URL resolution
 3. Sanitized HTML is loaded into sandboxed iframes (`allow-same-origin` only)
-4. A recursive DOM comparison walks both trees in parallel, comparing node types, tag names, attributes, and text content
+4. A recursive DOM comparison aligns sibling nodes by type, tag, and lightweight text similarity before comparing node types, tag names, attributes, and text content
 5. Differing text is highlighted at the word level; differing elements receive the `.diff-highlight` class
 
 ## Security

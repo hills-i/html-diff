@@ -21,9 +21,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const ignoreDomainCheckbox = document.getElementById('ignoreDomain');
     const modeRadios = document.querySelectorAll('input[name="mode"]');
     const diffHighlightClassName = 'diff-highlight';
+    const CHILD_ALIGNMENT_THRESHOLD = 0.45;
+    const MAX_CHILD_ALIGNMENT_MATRIX_SIZE = 10000;
 
     // Domain normalization for ignoring domain differences
     let domainPair = [null, null]; // [domain1, domain2] extracted from URLs
+    let normalizedNodeTextCache = new WeakMap();
 
     function extractDomain(url) {
         try {
@@ -85,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Set domain pair for normalization
         domainPair = [extractDomain(url1), extractDomain(url2)];
+        normalizedNodeTextCache = new WeakMap();
 
         diffButton.disabled = true;
         diffButton.textContent = 'Comparing...';
@@ -201,8 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function compareNodes(node1, node2) {
         if (!node1 || !node2) {
-            highlightNode(node1);
-            highlightNode(node2);
+            highlightSubtree(node1 || node2);
             return;
         }
 
@@ -247,12 +250,143 @@ document.addEventListener('DOMContentLoaded', () => {
         if (node1.nodeType === Node.ELEMENT_NODE || node1.nodeType === Node.DOCUMENT_NODE || node1.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
             const children1 = Array.from(node1.childNodes);
             const children2 = Array.from(node2.childNodes);
-            const maxLen = Math.max(children1.length, children2.length);
+            const alignedChildren = alignChildNodes(children1, children2);
 
-            for (let i = 0; i < maxLen; i++) {
-                compareNodes(children1[i], children2[i]);
+            alignedChildren.forEach(([child1, child2]) => {
+                compareNodes(child1, child2);
+            });
+        }
+    }
+
+    function alignChildNodes(children1, children2) {
+        if (children1.length * children2.length > MAX_CHILD_ALIGNMENT_MATRIX_SIZE) {
+            const maxLen = Math.max(children1.length, children2.length);
+            return Array.from({ length: maxLen }, (_, index) => [children1[index], children2[index]]);
+        }
+
+        const rows = children1.length + 1;
+        const cols = children2.length + 1;
+        const score = Array.from({ length: rows }, () => Array(cols).fill(0));
+        const direction = Array.from({ length: rows }, () => Array(cols).fill(null));
+
+        for (let i = 1; i < rows; i++) {
+            score[i][0] = score[i - 1][0];
+            direction[i][0] = 'delete';
+        }
+
+        for (let j = 1; j < cols; j++) {
+            score[0][j] = score[0][j - 1];
+            direction[0][j] = 'insert';
+        }
+
+        for (let i = 1; i < rows; i++) {
+            for (let j = 1; j < cols; j++) {
+                const similarity = getNodeSimilarity(children1[i - 1], children2[j - 1]);
+                const matchScore = similarity >= CHILD_ALIGNMENT_THRESHOLD
+                    ? score[i - 1][j - 1] + similarity
+                    : Number.NEGATIVE_INFINITY;
+                const deleteScore = score[i - 1][j];
+                const insertScore = score[i][j - 1];
+
+                if (matchScore >= deleteScore && matchScore >= insertScore) {
+                    score[i][j] = matchScore;
+                    direction[i][j] = 'match';
+                } else if (deleteScore >= insertScore) {
+                    score[i][j] = deleteScore;
+                    direction[i][j] = 'delete';
+                } else {
+                    score[i][j] = insertScore;
+                    direction[i][j] = 'insert';
+                }
             }
         }
+
+        const aligned = [];
+        let i = children1.length;
+        let j = children2.length;
+
+        while (i > 0 || j > 0) {
+            const move = direction[i][j];
+            if (move === 'match') {
+                aligned.unshift([children1[i - 1], children2[j - 1]]);
+                i--;
+                j--;
+            } else if (move === 'delete') {
+                aligned.unshift([children1[i - 1], null]);
+                i--;
+            } else {
+                aligned.unshift([null, children2[j - 1]]);
+                j--;
+            }
+        }
+
+        return aligned;
+    }
+
+    function getNodeSimilarity(node1, node2) {
+        if (!node1 || !node2 || node1.nodeType !== node2.nodeType) return 0;
+
+        if (node1.nodeType === Node.TEXT_NODE) {
+            const text1 = getNormalizedNodeText(node1);
+            const text2 = getNormalizedNodeText(node2);
+            if (!text1 && !text2) return 1;
+            if (!text1 || !text2) return 0;
+            return 0.5 + (getTextSimilarity(text1, text2) * 0.5);
+        }
+
+        if (node1.nodeType !== Node.ELEMENT_NODE) {
+            return 0.5;
+        }
+
+        if (node1.tagName !== node2.tagName) return 0;
+
+        const textSimilarity = getTextSimilarity(getNormalizedNodeText(node1), getNormalizedNodeText(node2));
+        let similarity = 0.45 + (textSimilarity * 0.35);
+
+        if (node1.id && node1.id === node2.id) {
+            similarity += 0.15;
+        }
+
+        const classSimilarity = getTokenSimilarity(node1.className, node2.className);
+        similarity += classSimilarity * 0.05;
+
+        return Math.min(similarity, 1);
+    }
+
+    function getNormalizedNodeText(node) {
+        const cachedText = normalizedNodeTextCache.get(node);
+        if (cachedText !== undefined) return cachedText;
+
+        const normalizedText = normalizeDomains((node.textContent || '').replace(/\s+/g, ' ').trim()).slice(0, 120);
+        normalizedNodeTextCache.set(node, normalizedText);
+        return normalizedText;
+    }
+
+    function getTextSimilarity(text1, text2) {
+        if (text1 === text2) return 1;
+        if (!text1 || !text2) return 0;
+
+        const maxLength = Math.max(text1.length, text2.length);
+        const minLength = Math.min(text1.length, text2.length);
+        let sharedPrefixLength = 0;
+
+        while (sharedPrefixLength < minLength &&
+               text1[sharedPrefixLength] === text2[sharedPrefixLength]) {
+            sharedPrefixLength++;
+        }
+
+        const lengthSimilarity = minLength / maxLength;
+        return (sharedPrefixLength / minLength) * lengthSimilarity;
+    }
+
+    function getTokenSimilarity(value1, value2) {
+        const tokens1 = new Set(String(value1 || '').split(/\s+/).filter(Boolean));
+        const tokens2 = new Set(String(value2 || '').split(/\s+/).filter(Boolean));
+        if (!tokens1.size && !tokens2.size) return 1;
+
+        const intersectionSize = [...tokens1].filter(token => tokens2.has(token)).length;
+        const unionSize = new Set([...tokens1, ...tokens2]).size;
+        return unionSize ? intersectionSize / unionSize : 0;
     }
 
     function highlightTextDifference(node1, node2) {
@@ -305,7 +439,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function highlightNode(node) {
-        if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
+        if (!node) return;
+
+        if (node.nodeType === Node.TEXT_NODE) {
+            if (!node.nodeValue.trim() || !node.parentNode) return;
+
+            const span = document.createElement('span');
+            span.classList.add(diffHighlightClassName);
+            span.textContent = node.nodeValue;
+            node.parentNode.replaceChild(span, node);
+            return;
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
 
         if (node.tagName !== 'BODY' &&
             node.tagName !== 'HTML' &&
@@ -316,6 +462,28 @@ document.addEventListener('DOMContentLoaded', () => {
             node.children.length === 0) {
             node.classList.add(diffHighlightClassName);
         }
+    }
+
+    function highlightSubtree(node) {
+        if (!node) return;
+
+        if (node.nodeType === Node.TEXT_NODE) {
+            highlightNode(node);
+            return;
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+        if (['BODY', 'HTML', 'HEAD', 'SCRIPT', 'STYLE'].includes(node.tagName)) {
+            return;
+        }
+
+        if (node.children.length === 0) {
+            highlightNode(node);
+            return;
+        }
+
+        Array.from(node.childNodes).forEach(highlightSubtree);
     }
 
     function debounce(func, wait) {
